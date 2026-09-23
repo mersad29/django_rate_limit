@@ -6,8 +6,8 @@ from django.http import HttpResponse
 from django.test import RequestFactory
 from django.utils.decorators import method_decorator
 
-from django_flex_limit import MemoryFixedWindowStorage
-from django_flex_limit.decorators import rate_limit
+from django_rate_limit import MemoryFixedWindowStorage
+from django_rate_limit.decorators import rate_limit
 
 
 if not settings.configured:
@@ -21,7 +21,7 @@ def rf():
 
 def test_function_view_returns_429_then_allows_new_window(rf):
     now = [10.0]
-    from django_flex_limit import FixedWindowRateLimiter
+    from django_rate_limit import FixedWindowRateLimiter
 
     limiter = FixedWindowRateLimiter(MemoryFixedWindowStorage(), clock=lambda: now[0])
 
@@ -94,7 +94,7 @@ def test_custom_backend_factory_and_algorithm_factory_are_injected(rf):
 
         def check(self, rate, *, key):
             events.append((rate, key))
-            from django_flex_limit import RateLimitResult
+            from django_rate_limit import RateLimitResult
             return RateLimitResult(True, 1, 0, 60, 0)
 
     @rate_limit("1/m", backend=Backend, algorithm=Limiter)

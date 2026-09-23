@@ -5,7 +5,7 @@ import uuid
 
 import pytest
 
-from django_flex_limit import RedisFixedWindowStorage, RedisStorageError
+from django_rate_limit import RedisFixedWindowStorage, RedisStorageError
 
 
 class FakeRedis:
@@ -88,11 +88,11 @@ def test_unknown_failure_policy_is_rejected(policy):
 
 
 def _live_storage():
-    redis = pytest.importorskip("redis", reason="install django-flex-limit[redis]")
-    url = __import__("os").environ.get("DJANGO_FLEX_LIMIT_REDIS_URL")
+    redis = pytest.importorskip("redis", reason="install django-rate-limit[redis]")
+    url = __import__("os").environ.get("DJANGO_RATE_LIMIT_REDIS_URL")
     if not url:
-        pytest.skip("set DJANGO_FLEX_LIMIT_REDIS_URL to run Redis integration tests")
-    prefix = f"django-flex-limit-test:{uuid.uuid4().hex}:"
+        pytest.skip("set DJANGO_RATE_LIMIT_REDIS_URL to run Redis integration tests")
+    prefix = f"django-rate-limit-test:{uuid.uuid4().hex}:"
     client = redis.Redis.from_url(url, socket_connect_timeout=0.5, socket_timeout=1)
     try:
         client.ping()
@@ -130,7 +130,7 @@ def test_live_redis_concurrent_requests_never_exceed_limit():
 
 
 def test_live_redis_connection_failure_raises_library_exception():
-    redis = pytest.importorskip("redis", reason="install django-flex-limit[redis]")
+    redis = pytest.importorskip("redis", reason="install django-rate-limit[redis]")
     client = redis.Redis(host="127.0.0.1", port=1, socket_connect_timeout=0.1)
     storage = RedisFixedWindowStorage(client, fail_policy="raise")
     try:

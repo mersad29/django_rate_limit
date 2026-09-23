@@ -2,7 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from django_flex_limit import (
+from django_rate_limit import (
     FixedWindowRateLimiter,
     InvalidRateLimit,
     MemoryFixedWindowStorage,
@@ -82,7 +82,7 @@ def test_storage_is_injected_and_receives_aligned_window_details():
 
         def consume(self, key, *, limit, reset_at, now):
             self.args = (key, limit, reset_at, now)
-            from django_flex_limit import StorageDecision
+            from django_rate_limit import StorageDecision
             return StorageDecision(True, limit - 1)
 
     storage = RecordingStorage()

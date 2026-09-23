@@ -1,4 +1,4 @@
-"""Framework-neutral core for the django-flex-limit package."""
+"""Framework-neutral core for the django-rate-limit package."""
 
 from .engine import FixedWindowRateLimiter, RateLimit, parse_rate
 from .decorators import rate_limit

@@ -85,7 +85,7 @@ class RedisFixedWindowStorage:
         client: object | None = None,
         *,
         url: str | None = None,
-        key_prefix: str = "django-flex-limit:",
+        key_prefix: str = "django-rate-limit:",
         fail_policy: Literal["open", "closed", "raise"] = "closed",
     ) -> None:
         if fail_policy not in {"open", "closed", "raise"}:

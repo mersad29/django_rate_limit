@@ -1,4 +1,4 @@
-"""Exceptions raised by django-flex-limit's framework-neutral core."""
+"""Exceptions raised by django-rate-limit's framework-neutral core."""
 
 
 class RateLimitError(Exception):

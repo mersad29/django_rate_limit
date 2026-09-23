@@ -1,6 +1,6 @@
-# django-flex-limit
+# django-rate-limit
 
-`django-flex-limit` is a small, reusable rate-limiting library for Django projects.
+`django-rate-limit` is a small, reusable rate-limiting library for Django projects.
 It keeps the rate-limit engine independent from Django HTTP responses and lets the
 Django integration live at the decorator layer.
 
@@ -36,7 +36,7 @@ Use the decorator on a function-based view:
 
 ```python
 from django.http import HttpResponse
-from django_flex_limit import rate_limit
+from django_rate_limit import rate_limit
 
 
 @rate_limit("5/m")
@@ -58,7 +58,7 @@ Decorate `dispatch` with Django's `method_decorator`:
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.http import HttpResponse
-from django_flex_limit import rate_limit
+from django_rate_limit import rate_limit
 
 
 @method_decorator(rate_limit("20/h"), name="dispatch")
@@ -161,7 +161,7 @@ This is useful when observing a new policy before enforcing it.
 Redis storage is injected into the decorator through `backend`.
 
 ```python
-from django_flex_limit import RedisFixedWindowStorage, rate_limit
+from django_rate_limit import RedisFixedWindowStorage, rate_limit
 
 
 redis_backend = RedisFixedWindowStorage(
@@ -195,7 +195,7 @@ Open and closed modes log every Redis error.
 The core engine does not know about Django requests or responses:
 
 ```python
-from django_flex_limit import FixedWindowRateLimiter, MemoryFixedWindowStorage
+from django_rate_limit import FixedWindowRateLimiter, MemoryFixedWindowStorage
 
 
 storage = MemoryFixedWindowStorage()
@@ -249,21 +249,21 @@ available:
 
 ```bash
 pip install ".[redis]"
-set DJANGO_FLEX_LIMIT_REDIS_URL=redis://localhost:6379/0
+set DJANGO_RATE_LIMIT_REDIS_URL=redis://localhost:6379/0
 pytest -q
 ```
 
 On PowerShell:
 
 ```powershell
-$env:DJANGO_FLEX_LIMIT_REDIS_URL = "redis://localhost:6379/0"
+$env:DJANGO_RATE_LIMIT_REDIS_URL = "redis://localhost:6379/0"
 pytest -q
 ```
 
 ## Public API
 
 ```python
-from django_flex_limit import (
+from django_rate_limit import (
     FixedWindowRateLimiter,
     FixedWindowStorage,
     InvalidRateLimit,
