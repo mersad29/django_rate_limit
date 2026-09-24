@@ -10,7 +10,7 @@ from typing import Callable
 
 from .exceptions import InvalidRateLimit, StorageError
 from .result import RateLimitResult
-from .storage import FixedWindowStorage
+from .storage import FixedWindowStorage, TokenBucketStorage
 
 
 _RATE_RE = re.compile(r"^\s*(\d+)\s*/\s*([a-zA-Z]+)\s*$")
@@ -109,3 +109,67 @@ class FixedWindowRateLimiter:
             retry_after=max(0.0, reset_at - now) if not decision.allowed else 0.0,
         )
 
+
+class TokenBucketRateLimiter:
+    """Evaluate a token-bucket policy using an injected atomic storage backend.
+
+    The rate's count is the bucket capacity and its period determines the
+    refill rate.  For example, ``"5/m"`` starts with five tokens and refills
+    at five tokens per minute.  A request consumes one token.
+    """
+
+    def __init__(
+        self,
+        storage: TokenBucketStorage,
+        *,
+        clock: Callable[[], float] = time.time,
+    ) -> None:
+        if storage is None or not callable(getattr(storage, "consume", None)):
+            raise TypeError("storage must provide a callable consume() method")
+        if not callable(clock):
+            raise TypeError("clock must be callable")
+        self._storage = storage
+        self._clock = clock
+
+    def check(self, rate: str | RateLimit, *, key: str) -> RateLimitResult:
+        """Consume one token for ``key`` and return its decision."""
+        policy = parse_rate(rate) if isinstance(rate, str) else rate
+        if not isinstance(policy, RateLimit):
+            raise InvalidRateLimit("rate must be a rate string or RateLimit instance")
+        if not isinstance(key, str) or not key.strip():
+            raise InvalidRateLimit("key must be a non-empty string")
+
+        now = self._clock()
+        if isinstance(now, bool) or not isinstance(now, (int, float)) or not math.isfinite(now):
+            raise StorageError("clock must return a finite Unix timestamp")
+        now = float(now)
+        refill_rate = policy.limit / policy.period
+        bucket_key = f"{key}:{policy.limit}:{policy.period}"
+        try:
+            decision = self._storage.consume(
+                bucket_key,
+                capacity=policy.limit,
+                refill_rate=refill_rate,
+                now=now,
+            )
+        except Exception as exc:
+            raise StorageError("storage failed to consume token-bucket capacity") from exc
+        if not isinstance(decision.allowed, bool) or not isinstance(decision.remaining, int):
+            raise StorageError("storage returned an invalid token-bucket decision")
+        if not 0 <= decision.remaining <= policy.limit:
+            raise StorageError("storage returned remaining capacity outside the policy bounds")
+        if (
+            isinstance(decision.reset_at, bool)
+            or not isinstance(decision.reset_at, (int, float))
+            or not math.isfinite(decision.reset_at)
+        ):
+            raise StorageError("storage returned an invalid token-bucket reset time")
+        reset_at = float(decision.reset_at)
+        retry_after = max(0.0, reset_at - now) if not decision.allowed else 0.0
+        return RateLimitResult(
+            allowed=decision.allowed,
+            limit=policy.limit,
+            remaining=decision.remaining,
+            reset_at=reset_at,
+            retry_after=retry_after,
+        )

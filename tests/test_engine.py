@@ -8,8 +8,10 @@ from django_rate_limit import (
     MemoryFixedWindowStorage,
     RateLimit,
     StorageError,
+    TokenBucketRateLimiter,
     parse_rate,
 )
+from django_rate_limit.storage import MemoryTokenBucketStorage
 
 
 @pytest.mark.parametrize(
@@ -115,3 +117,53 @@ def test_non_rate_policy_and_bad_clock_are_rejected():
     with pytest.raises(InvalidRateLimit, match="RateLimit"):
         FixedWindowRateLimiter(MemoryFixedWindowStorage(), clock=lambda: 1).check(123, key="k")
 
+
+def test_token_bucket_bursts_to_capacity_then_refills_fractionally():
+    now = [0.0]
+    limiter = TokenBucketRateLimiter(MemoryTokenBucketStorage(), clock=lambda: now[0])
+    results = [limiter.check("2/s", key="user") for _ in range(3)]
+    assert [result.allowed for result in results] == [True, True, False]
+    assert [result.remaining for result in results] == [1, 0, 0]
+    assert results[-1].retry_after == pytest.approx(0.5)
+    now[0] = 0.5
+    result = limiter.check("2/s", key="user")
+    assert result.allowed
+    assert result.remaining == 0
+
+
+def test_token_bucket_refill_is_capped_and_keys_are_isolated():
+    now = [0.0]
+    storage = MemoryTokenBucketStorage()
+    limiter = TokenBucketRateLimiter(storage, clock=lambda: now[0])
+    assert limiter.check("3/m", key="a").allowed
+    now[0] = 120.0
+    result = limiter.check("3/m", key="a")
+    assert result.remaining == 2
+    assert limiter.check("3/m", key="b").remaining == 2
+
+
+def test_token_bucket_concurrent_consumes_never_exceed_capacity():
+    limiter = TokenBucketRateLimiter(MemoryTokenBucketStorage(), clock=lambda: 10)
+    with ThreadPoolExecutor(max_workers=16) as executor:
+        results = list(executor.map(lambda _: limiter.check("10/m", key="shared"), range(100)))
+    assert sum(result.allowed for result in results) == 10
+
+
+def test_token_bucket_storage_errors_are_wrapped_with_cause():
+    class BrokenStorage:
+        def consume(self, *args, **kwargs):
+            raise OSError("offline")
+
+    with pytest.raises(StorageError) as exc:
+        TokenBucketRateLimiter(BrokenStorage(), clock=lambda: 1).check("1/m", key="k")
+    assert isinstance(exc.value.__cause__, OSError)
+
+
+def test_token_bucket_rejects_invalid_storage_decision():
+    class BadStorage:
+        def consume(self, *args, **kwargs):
+            from django_rate_limit import TokenBucketDecision
+            return TokenBucketDecision(True, 0, float("nan"))
+
+    with pytest.raises(StorageError, match="reset"):
+        TokenBucketRateLimiter(BadStorage(), clock=lambda: 1).check("1/m", key="k")

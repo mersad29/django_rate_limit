@@ -6,7 +6,7 @@ from django.http import HttpResponse
 from django.test import RequestFactory
 from django.utils.decorators import method_decorator
 
-from django_rate_limit import MemoryFixedWindowStorage
+from django_rate_limit import MemoryFixedWindowStorage, TokenBucketRateLimiter
 from django_rate_limit.decorators import rate_limit
 
 
@@ -146,3 +146,14 @@ def test_async_function_view_preserves_async_response_lifecycle(rf):
     response = asyncio.run(view(rf.get("/")))
     assert response.status_code == 200
     assert response.content == b"async ok"
+
+
+def test_token_bucket_algorithm_uses_matching_default_backend(rf):
+    @rate_limit("2/s", algorithm=TokenBucketRateLimiter)
+    def view(request):
+        return HttpResponse("ok")
+
+    request = rf.get("/")
+    assert view(request).status_code == 200
+    assert view(request).status_code == 200
+    assert view(request).status_code == 429

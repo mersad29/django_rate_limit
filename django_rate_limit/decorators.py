@@ -8,13 +8,14 @@ from typing import Any, Callable, Iterable
 
 from django.http import HttpRequest, HttpResponse
 
-from .engine import FixedWindowRateLimiter
-from .storage import MemoryFixedWindowStorage
+from .engine import FixedWindowRateLimiter, TokenBucketRateLimiter
+from .storage import MemoryFixedWindowStorage, MemoryTokenBucketStorage
 
 
 # A shared process-local store allows separate decorated views to work without
 # settings, while view-scoped keys keep their counters independent.
 _DEFAULT_BACKEND = MemoryFixedWindowStorage()
+_DEFAULT_TOKEN_BUCKET_BACKEND = MemoryTokenBucketStorage()
 
 
 def rate_limit(
@@ -58,7 +59,7 @@ def rate_limit(
     if key is not None and not callable(key) and key not in {"ip", "user"}:
         raise ValueError("key must be 'ip', 'user', or a request-to-key callable")
 
-    store = _resolve_backend(backend)
+    store = _resolve_backend(backend, algorithm)
     limiter = _resolve_algorithm(algorithm, store)
     if not callable(getattr(limiter, "check", None)):
         raise TypeError("algorithm must provide a callable check(rate, key=...) method")
@@ -107,8 +108,10 @@ def _validate_method(method: object) -> str:
     return method.upper()
 
 
-def _resolve_backend(backend: Any) -> Any:
+def _resolve_backend(backend: Any, algorithm: Any = None) -> Any:
     if backend is None:
+        if algorithm is TokenBucketRateLimiter:
+            return _DEFAULT_TOKEN_BUCKET_BACKEND
         return _DEFAULT_BACKEND
     store = (
         backend()

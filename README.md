@@ -8,12 +8,12 @@ The current release includes:
 
 - Function-based view support through `@rate_limit`
 - Class-based view support when decorating `dispatch` with Django's `method_decorator`
-- Fixed Window rate limiting
+- Fixed Window and Token Bucket algorythm support
 - In-process memory storage
 - HTTP 429 responses for blocked Django requests
 - A framework-neutral core that can be tested without Django
 
-Sliding Window Counter, Token Bucket and Redis support is planned for a later release.
+Redis is planned for a later release.
 
 ## Installation
 
@@ -122,3 +122,16 @@ Or provide a custom callable:
 
 The decorator combines this identity with the decorated view name, so separate
 views do not share counters by default.
+
+## Token Bucket
+
+The count is the bucket capacity and the period controls the refill rate, so `"5/m"` allows an initial burst of five requests and then refills at five tokens per minute:
+
+```python
+from django_rate_limit import TokenBucketRateLimiter, rate_limit
+
+
+@rate_limit("5/m", algorithm=TokenBucketRateLimiter)
+def search(request):
+    ...
+```
